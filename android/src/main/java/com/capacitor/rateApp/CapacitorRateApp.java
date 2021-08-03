@@ -26,7 +26,7 @@ public class CapacitorRateApp extends Plugin
     public void requestReview(final PluginCall call)
     {
 
-        ReviewManager manager = ReviewManagerFactory.create(this);
+        ReviewManager manager = ReviewManagerFactory.create(getContext());
         AppCompatActivity activity = getActivity();
         Task<ReviewInfo> request = manager.requestReviewFlow();
         request.addOnCompleteListener(task -> {
