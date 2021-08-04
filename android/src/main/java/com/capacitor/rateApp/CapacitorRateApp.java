@@ -25,18 +25,56 @@ public class CapacitorRateApp extends Plugin
     @PluginMethod()
     public void requestReview(final PluginCall call)
     {
-
-        ReviewManager manager = ReviewManagerFactory.create(getContext());
-        AppCompatActivity activity = getActivity();
+        // final ReviewManager manager = ReviewManagerFactory.create(getContext());
+        ReviewManager manager = new FakeReviewManager(getContext());
+        final AppCompatActivity activity = getActivity();
         Task<ReviewInfo> request = manager.requestReviewFlow();
-        request.addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                // We can get the ReviewInfo object
-                ReviewInfo reviewInfo = task.getResult();
-                Task<Void> flow = manager.launchReviewFlow(activity, reviewInfo);
-            } else {
-                // There was some problem, log or handle the error code.
-                @ReviewErrorCode int reviewErrorCode = ((TaskException) task.getException()).getErrorCode();
+        request.addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(Exception e)
+            {
+                e.printStackTrace();
+                call.reject("Request Failed", e);
+            }
+        });
+        request.addOnCompleteListener(new OnCompleteListener<ReviewInfo>() {
+            @Override
+            public void onComplete(Task<ReviewInfo> task)
+            {
+                if (task.isSuccessful()) {
+                    // We can get the ReviewInfo object
+                    ReviewInfo reviewInfo = task.getResult();
+                    Task<Void> flow = manager.launchReviewFlow(activity, reviewInfo);
+                    flow.addOnCompleteListener(new OnCompleteListener<Void>() {
+                        @Override
+                        public void onComplete(Task<Void> task)
+                        {
+                            // The flow has finished. The API does not indicate whether the user
+                            // reviewed or not, or even whether the review dialog was shown. Thus, no
+                            // matter the result, we continue our app flow.
+                            call.resolve();
+                        }
+                    });
+                    flow.addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void result)
+                        {
+                            call.resolve();
+                        }
+                    });
+                    flow.addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(Exception e)
+                        {
+                            e.printStackTrace();
+                            call.reject("Flow Failed", e);
+                        }
+                    });
+                }
+                else {
+                    // There was some problem, continue regardless of the result.
+                    call.reject("Task Failed");
+                }
             }
         });
     }
